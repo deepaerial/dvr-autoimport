@@ -1,3 +1,4 @@
+#!/usr/bin/osascript
 set envVarName to "DVR_EXPORT_PATH"
 set exportPath to do shell script "echo $" & envVarName
 
