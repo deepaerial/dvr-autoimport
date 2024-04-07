@@ -18,7 +18,7 @@ tell application "Finder"
         return
     end if
 
-    set mediaFiles to (files of folder mediaFolderPath whose (name extension is "mp4" or name extension is "srt"))
+    set mediaFiles to (files of folder mediaFolderPath whose (name extension is "mp4" or name extension is "srt" or name extension is "mov"))
 
     if (count of mediaFiles) is 0 then
         display dialog "No MP4 or SRT files found in the DCIM/100MEDIA folder." buttons {"OK"} default button 1 with title "DVR Export: Error"
