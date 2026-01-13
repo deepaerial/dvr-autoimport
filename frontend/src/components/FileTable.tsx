@@ -5,7 +5,6 @@ export interface MediaFile {
   filename: string;
   size: number;
   duration: string;
-  exportProgress?: number;
   status: 'pending' | 'exporting' | 'completed';
 }
 
@@ -60,12 +59,12 @@ export function FileTable({ files }: FileTableProps) {
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs text-green-400">
                       <span>[EXPORTING...]</span>
-                      <span>{file.exportProgress}%</span>
+                      <span>{file.id}%</span> 
                     </div>
                     <div className="w-full bg-gray-900 border border-green-900 h-4 overflow-hidden">
                       <div
                         className="bg-green-500 h-full transition-all duration-300"
-                        style={{ width: `${file.exportProgress}%` }}
+                        style={{ width: `${file.id}%` }}
                       />
                     </div>
                   </div>

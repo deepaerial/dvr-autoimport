@@ -4,28 +4,7 @@ import { FileTable } from './FileTable';
 import type { MediaFile } from './FileTable';
 
 import SelectVolume from './SelectVolume';
-
 import { GetMediaFilesForVolume } from '../../wailsjs/go/main/App';
-
-// Mock media files for each volume
-const mockMediaFiles: Record<string, MediaFile[]> = {
-  vol1: [
-    { id: '1', filename: 'DVR_2026_01_09_08_30_15.mp4', size: 524288000, duration: '00:15:32', status: 'pending' },
-    { id: '2', filename: 'DVR_2026_01_09_09_45_22.mp4', size: 734003200, duration: '00:21:08', status: 'pending' },
-    { id: '3', filename: 'DVR_2026_01_09_11_22_48.mp4', size: 456654848, duration: '00:13:12', status: 'pending' },
-    { id: '4', filename: 'DVR_2026_01_09_14_10_05.mp4', size: 892928000, duration: '00:25:47', status: 'pending' },
-    { id: '5', filename: 'DVR_2026_01_09_16_33_19.mp4', size: 612368384, duration: '00:17:42', status: 'pending' },
-  ],
-  vol2: [
-    { id: '6', filename: 'CAMERA_001_2026_01_08.mp4', size: 1073741824, duration: '00:31:05', status: 'pending' },
-    { id: '7', filename: 'CAMERA_001_2026_01_09.mp4', size: 945815552, duration: '00:27:18', status: 'pending' },
-  ],
-  vol3: [
-    { id: '8', filename: 'REC_20260109_120034.mp4', size: 672137216, duration: '00:19:23', status: 'pending' },
-    { id: '9', filename: 'REC_20260109_150512.mp4', size: 823164928, duration: '00:23:45', status: 'pending' },
-    { id: '10', filename: 'REC_20260109_183045.mp4', size: 545259520, duration: '00:15:45', status: 'pending' },
-  ],
-};
 
 
 export default function App() {
@@ -36,8 +15,8 @@ export default function App() {
 
   const handleVolumeChange = (volumePath: string) => {
     setSelectedVolume(volumePath);
-    // TODO: Implement loic that will fetch media files and display them in the table
-    GetMediaFilesForVolume(volumePath).then((_) => {});
+    // TODO: Implement logic that will fetch media files and display them in the table
+    GetMediaFilesForVolume(volumePath).then((files) => {console.log(files)});
     setIsExporting(false);
   };
 
@@ -88,7 +67,7 @@ export default function App() {
         <div className="mb-8 border border-green-500 p-4 bg-black">
           <div className="text-green-500">
             <div className="text-xs mb-2">┌─────────────────────────────────────────────────────────────────┐</div>
-            <div className="text-2xl font-bold mb-2 pl-2">│ DVR FOOTAGE EXPORTER v1.0</div>
+            <div className="text-2xl font-bold mb-2 pl-2">│ DVR FOOTAGE EXPORTER v1.0</div> {/* TODO: Add version number from wails.json */}
             <div className="text-sm pl-2 text-green-400">│ Select mounted volume and export DVR media files</div>
             <div className="text-xs mt-2">└─────────────────────────────────────────────────────────────────┘</div>
           </div>

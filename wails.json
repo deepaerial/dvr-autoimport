@@ -9,5 +9,8 @@
   "author": {
     "name": "deepaerial",
     "email": "nazarii.oleksiuk@gmail.com"
+  },
+  "info": {
+    "productVersion": "0.2.0"
   }
 }

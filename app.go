@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"io/fs"
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"golang.org/x/sys/unix"
@@ -25,18 +28,6 @@ func (a *App) startup(ctx context.Context) {
 }
 
 var mountPrefixesToSkip = [...]string{"/dev", "/System", "/private"}
-
-func shouldSkipMountPoint(mountPoint string) bool {
-	if mountPoint == "/" {
-		return true
-	}
-	for _, prefix := range mountPrefixesToSkip {
-		if strings.HasPrefix(mountPoint, prefix) {
-			return true
-		}
-	}
-	return false
-}
 
 // VolumesFromGetfsstat retrieves a list of mounted filesystem volumes on the system.
 // Returns:
@@ -80,9 +71,32 @@ type MediaFile struct {
 func (a *App) GetMediaFilesForVolume(volumePath string) ([]MediaFile, error) {
 	// Placeholder implementation: In a real application, this function would
 	// scan the specified volume for media files and return their paths.
-	log.Printf(volumePath)
-	return []MediaFile{
-		{Path: "/path/to/media1.mp4", Filename: "media1.mp4", Size: 1024},
-		{Path: "/path/to/media2.mkv", Filename: "media2.mkv", Size: 2048},
-	}, nil
+	var foundMediaFiles []MediaFile
+	err := filepath.WalkDir(volumePath, func(path string, info fs.DirEntry, err error) error {
+		if err != nil {
+			if os.IsPermission(err) {
+				log.Printf("skipping (permission): %s: %v", path, err)
+				return nil
+			}
+			log.Printf("walk error for %s: %v", path, err)
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if !IsMedia(path) {
+			return nil
+		}
+		fileinfo, err := info.Info()
+		if err != nil {
+			log.Printf("error getting file size for %s: %v", path, err)
+			return nil
+		}
+		// TODO: extract real duration for video files
+		foundMediaFiles = append(foundMediaFiles, MediaFile{Path: path, Filename: info.Name(), Size: fileinfo.Size(), Status: "found", Duration: "0"})
+		return nil
+	})
+	if err != nil {
+		log.Printf("error at: %v", err)
+	}
+	return foundMediaFiles, nil
 }
