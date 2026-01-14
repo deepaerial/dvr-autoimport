@@ -27,8 +27,6 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 }
 
-var mountPrefixesToSkip = [...]string{"/dev", "/System", "/private"}
-
 // VolumesFromGetfsstat retrieves a list of mounted filesystem volumes on the system.
 // Returns:
 //   - A slice of strings representing the mount points of the filesystems.
@@ -65,12 +63,10 @@ type MediaFile struct {
 	Filename string
 	Size     int64
 	Status   string
-	Duration string
+	Duration uint64
 }
 
 func (a *App) GetMediaFilesForVolume(volumePath string) ([]MediaFile, error) {
-	// Placeholder implementation: In a real application, this function would
-	// scan the specified volume for media files and return their paths.
 	var foundMediaFiles []MediaFile
 	err := filepath.WalkDir(volumePath, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
@@ -86,13 +82,22 @@ func (a *App) GetMediaFilesForVolume(volumePath string) ([]MediaFile, error) {
 		if !IsMedia(path) {
 			return nil
 		}
+		name := info.Name()
+		if strings.HasPrefix(name, ".") {
+			// skip hidden files
+			return nil
+		}
 		fileinfo, err := info.Info()
 		if err != nil {
 			log.Printf("error getting file size for %s: %v", path, err)
 			return nil
 		}
-		// TODO: extract real duration for video files
-		foundMediaFiles = append(foundMediaFiles, MediaFile{Path: path, Filename: info.Name(), Size: fileinfo.Size(), Status: "found", Duration: "0"})
+		duration, err := GetVideoDurationSeconds(path)
+		if err != nil {
+			log.Printf("error getting video duration for %s: %v", path, err)
+			duration = 0
+		}
+		foundMediaFiles = append(foundMediaFiles, MediaFile{Path: path, Filename: name, Size: fileinfo.Size(), Status: "found", Duration: duration})
 		return nil
 	})
 	if err != nil {

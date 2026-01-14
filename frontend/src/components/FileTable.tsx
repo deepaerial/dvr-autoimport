@@ -1,24 +1,33 @@
 import { Play, CheckCircle2, FolderOpen } from 'lucide-react';
 
 export interface MediaFile {
-  id: string;
+  path: string;
   filename: string;
   size: number;
-  duration: string;
-  status: 'pending' | 'exporting' | 'completed';
+  status: string;
+  duration: number;
+  isChecked?: boolean;
 }
 
 interface FileTableProps {
   files: MediaFile[];
+  onCheckChange: (file: MediaFile, isChecked: boolean) => void;
 }
 
-export function FileTable({ files }: FileTableProps) {
+export function FileTable({ files, onCheckChange }: FileTableProps) {
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
     if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
     return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
   };
+
+  // const formatDurationHHMM = (miliseconds: number): string => {
+  //   const totalSeconds = Math.floor(miliseconds / 1000);
+  //   const hours = Math.floor(totalSeconds / 3600);
+  //   const minutes = Math.floor((totalSeconds % 3600) / 60);
+  //   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  // };
 
   const handleShowInFileSystem = (filename: string) => {
     // In a real application, this would call an API to open the file location
@@ -38,11 +47,15 @@ export function FileTable({ files }: FileTableProps) {
           </tr>
         </thead>
         <tbody>
-          {files.map((file) => (
-            <tr key={file.id} className="border-b border-green-900 hover:bg-green-950">
+          {files.map((file, id) => (
+            <tr key={id} className="border-b border-green-900 hover:bg-green-950">
               <td className="px-4 py-3 text-sm text-green-400">
                 <div className="flex items-center gap-2">
                   <Play className="size-4 text-green-500" />
+                  <input type="checkbox" checked={file.isChecked} onChange={(e) => {
+                
+                      onCheckChange(file, e.target.checked);
+                  }} />
                   {file.filename}
                 </div>
               </td>
@@ -59,12 +72,12 @@ export function FileTable({ files }: FileTableProps) {
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs text-green-400">
                       <span>[EXPORTING...]</span>
-                      <span>{file.id}%</span> 
+                      <span>{id}%</span> 
                     </div>
                     <div className="w-full bg-gray-900 border border-green-900 h-4 overflow-hidden">
                       <div
                         className="bg-green-500 h-full transition-all duration-300"
-                        style={{ width: `${file.id}%` }}
+                        style={{ width: `${id}%` }}
                       />
                     </div>
                   </div>

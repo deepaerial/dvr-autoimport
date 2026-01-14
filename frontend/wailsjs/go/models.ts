@@ -5,7 +5,7 @@ export namespace main {
 	    Filename: string;
 	    Size: number;
 	    Status: string;
-	    Duration: string;
+	    Duration: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new MediaFile(source);

@@ -3,6 +3,8 @@ module DVRAutoimporter
 go 1.23
 
 require (
+	github.com/abema/go-mp4 v1.4.1
+	github.com/sunfish-shogi/bufseekio v0.0.0-20210207115823-a4185644b365
 	github.com/wailsapp/wails/v2 v2.11.0
 	golang.org/x/sys v0.30.0
 )
