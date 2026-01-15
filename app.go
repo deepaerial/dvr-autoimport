@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"golang.org/x/sys/unix"
 )
 
@@ -104,4 +105,14 @@ func (a *App) GetMediaFilesForVolume(volumePath string) ([]MediaFile, error) {
 		log.Printf("error at: %v", err)
 	}
 	return foundMediaFiles, nil
+}
+
+func (a *App) ChooseDestinationFolder() (string, error) {
+	result, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Choose Export Destination",
+	})
+	if err != nil {
+		return "", err
+	}
+	return result, nil
 }

@@ -4,12 +4,12 @@ import type { MediaFile } from "./FileTable";
 import { FileTable } from "./FileTable";
 
 import SelectVolume from "./SelectVolume";
-import { GetMediaFilesForVolume } from "../../wailsjs/go/main/App";
+import { GetMediaFilesForVolume, ChooseDestinationFolder } from "../../wailsjs/go/main/App";
 
 export default function App() {
   const [selectedVolume, setSelectedVolume] = useState<string>("");
   // TODO: Choosing export destination via file dialog
-  const [exportDestination, setExportDestination] = useState<string | null>(null);
+  const [exportDestination, setExportDestination] = useState<string>("");
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [isExporting, setIsExporting] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -40,6 +40,12 @@ export default function App() {
       f.path === file.path ? { ...f, isChecked } : f
     );
     setMediaFiles(updatedFiles);
+  }
+
+  const onChooseDestinationClick = () => {
+    ChooseDestinationFolder().then((folderPath) => {
+      setExportDestination(folderPath);
+    });
   }
 
   const handleExport = () => {
@@ -88,14 +94,13 @@ export default function App() {
               </label>
               <div className="flex gap-2">
                 <input
-                  type="text"
-                  value={""}
                   readOnly
-                  onChange={(e) => setExportDestination(e.target.value)}
+                  type="text"
+                  value={exportDestination}
                   className="flex-1 px-4 py-2 border border-green-500 bg-black text-green-400 focus:outline-none focus:ring-2 focus:ring-green-500 font-mono"
                   placeholder="Choose where to export footage"
                 />
-                <button className="px-4 py-2 border border-green-500 bg-black text-green-400 hover:bg-green-500 hover:text-black transition-colors">
+                <button className="px-4 py-2 border border-green-500 bg-black text-green-400 hover:bg-green-500 hover:text-black transition-colors" onClick={onChooseDestinationClick}>
                   BROWSE
                 </button>
               </div>
