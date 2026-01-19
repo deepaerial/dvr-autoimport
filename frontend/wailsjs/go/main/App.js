@@ -6,6 +6,10 @@ export function ChooseDestinationFolder() {
   return window['go']['main']['App']['ChooseDestinationFolder']();
 }
 
+export function ExportFiles(arg1, arg2) {
+  return window['go']['main']['App']['ExportFiles'](arg1, arg2);
+}
+
 export function GetMediaFilesForVolume(arg1) {
   return window['go']['main']['App']['GetMediaFilesForVolume'](arg1);
 }

@@ -1,61 +1,159 @@
-import { useState } from "react";
-import { HardDrive, FolderOpen, Download, LoaderCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { HardDrive, FolderOpen, LoaderCircle } from "lucide-react";
 import type { MediaFile } from "./FileTable";
 import { FileTable } from "./FileTable";
+import { EventsOn } from "../../wailsjs/runtime/runtime";
 
 import SelectVolume from "./SelectVolume";
-import { GetMediaFilesForVolume, ChooseDestinationFolder } from "../../wailsjs/go/main/App";
+import {
+  GetMediaFilesForVolume,
+  ChooseDestinationFolder,
+  ExportFiles,
+} from "../../wailsjs/go/main/App";
+
+export interface ExportProgressPayload {
+  fileName: string;
+  filePath: string;
+  totalSize: number;
+  bytesCopied: number;
+  percentage: number;
+}
 
 export default function App() {
   const [selectedVolume, setSelectedVolume] = useState<string>("");
-  // TODO: Choosing export destination via file dialog
   const [exportDestination, setExportDestination] = useState<string>("");
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [isExporting, setIsExporting] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [exportError, setExportError] = useState<string | null>(null); // New state for export errors
+  const [exportSuccess, setExportSuccess] = useState<boolean>(false); // New state for export success
+  const [exportProgress, setExportProgress] = useState<
+    Record<string, ExportProgressPayload>
+  >({});
 
-  // TODO: add config option to override files if they already exist at destination
+  useEffect(() => {
+    EventsOn("export-progress", (payload: ExportProgressPayload) => {
+      if (payload.percentage === 100) {
+        setMediaFiles((prevFiles) =>
+          prevFiles.map((f) =>
+            f.filename === payload.fileName ? { ...f, status: "completed" } : f,
+          ),
+        );
+      } else
+        setExportProgress((prev) => ({ ...prev, [payload.fileName]: payload }));
+    });
+  }, []);
 
   const handleVolumeChange = (volumePath: string) => {
+    if (volumePath === "") {
+      setSelectedVolume("");
+      setMediaFiles([]);
+      setIsLoading(false);
+      setExportProgress({});
+      return;
+    }
     setSelectedVolume(volumePath);
     setIsLoading(true);
+    setExportError(null);
+    setExportSuccess(false);
+    setExportProgress({});
 
-    GetMediaFilesForVolume(volumePath).then((files) => {
-      const converted = files.map((file) => ({
-        path: file.Path,
-        filename: file.Filename,
-        size: file.Size,
-        status: file.Status,
-        duration: file.Duration,
-        isChecked: true, // by default, all files are checked for export
-      }));
-      setMediaFiles(converted);
-      setIsLoading(false);
-    });
+    GetMediaFilesForVolume(volumePath)
+      .then((files) => {
+        const converted = files.map((file) => ({
+          path: file.Path,
+          filename: file.Filename,
+          size: file.Size,
+          status: "found",
+          duration: file.Duration,
+          isChecked: true, // by default, all files are checked for export
+        }));
+        setMediaFiles(converted);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        console.error("Error getting media files:", err);
+        setExportError(`Failed to load media files: ${err}`);
+        setIsLoading(false);
+      });
     setIsExporting(false);
   };
 
   const onCheckChange = (file: MediaFile, isChecked: boolean) => {
     const updatedFiles = mediaFiles.map((f) =>
-      f.path === file.path ? { ...f, isChecked } : f
+      f.path === file.path ? { ...f, isChecked } : f,
     );
     setMediaFiles(updatedFiles);
-  }
+  };
 
-  const onChooseDestinationClick = () => {
-    ChooseDestinationFolder().then((folderPath) => {
-      setExportDestination(folderPath);
-    });
-  }
+  const onCheckToggleAll = (isChecked: boolean) => {
+    const updatedFiles = mediaFiles.map((f) => ({ ...f, isChecked }));
+    setMediaFiles(updatedFiles);
+  };
 
-  const handleExport = () => {
-    // TODO: Implement export logic
-    if (exportDestination) {
-      setIsExporting(true);
+  const handleChooseDestinationClick = async () => {
+    // Changed name to avoid conflict, added async
+    setExportError(null);
+    setExportSuccess(false);
+    try {
+      const folderPath = await ChooseDestinationFolder();
+      if (folderPath) {
+        setExportDestination(folderPath);
+      }
+    } catch (err) {
+      console.error("Error choosing destination folder:", err);
+      setExportError(`Failed to choose destination: ${err}`);
     }
   };
 
-  const canExport = selectedVolume && mediaFiles.length > 0 && !isExporting;
+  const handleExportSelected = async (selectedFiles: MediaFile[]) => {
+    setExportError(null);
+    setExportSuccess(false);
+    setExportProgress({});
+    if (!exportDestination) {
+      alert("Please choose an export destination first.");
+      return;
+    }
+
+    if (selectedFiles.length === 0) {
+      alert("No files selected for export.");
+      return;
+    }
+
+    setIsExporting(true);
+    setMediaFiles((prevFiles) =>
+      prevFiles.map((f) =>
+        selectedFiles.some((sf) => sf.path === f.path)
+          ? { ...f, status: "exporting" }
+          : f,
+      ),
+    );
+
+    try {
+      const filePaths = selectedFiles.map((file) => file.path);
+      await ExportFiles(filePaths, exportDestination);
+      setExportSuccess(true);
+      setMediaFiles((prevFiles) =>
+        prevFiles.map((f) =>
+          selectedFiles.some((sf) => sf.path === f.path)
+            ? { ...f, status: "completed" }
+            : f,
+        ),
+      );
+    } catch (err) {
+      console.error("Error during export:", err);
+      setExportError(`Export failed: ${err}`);
+      setMediaFiles((prevFiles) =>
+        prevFiles.map((f) =>
+          selectedFiles.some((sf) => sf.path === f.path)
+            ? { ...f, status: "found" }
+            : f,
+        ),
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-black p-8 font-mono">
@@ -63,10 +161,19 @@ export default function App() {
         {/* Header */}
         <div className="mb-8 border border-green-500 p-4 bg-black">
           <div className="text-green-500">
-            <div className="text-xs mb-2">┌─────────────────────────────────────────────────────────────────┐</div>
-            <div className="text-2xl font-bold mb-2 pl-2">│ DVR FOOTAGE EXPORTER v1.0</div> {/* TODO: Add version number from wails.json */}
-            <div className="text-sm pl-2 text-green-400">│ Select mounted volume and export DVR media files</div>
-            <div className="text-xs mt-2">└─────────────────────────────────────────────────────────────────┘</div>
+            <div className="text-xs mb-2">
+              ┌─────────────────────────────────────────────────────────────────┐
+            </div>
+            <div className="text-2xl font-bold mb-2 pl-2">
+              │ DVR FOOTAGE EXPORTER v1.0
+            </div>{" "}
+            {/* TODO: Add version number from wails.json */}
+            <div className="text-sm pl-2 text-green-400">
+              │ Select mounted volume and export DVR media files
+            </div>
+            <div className="text-xs mt-2">
+              └─────────────────────────────────────────────────────────────────┘
+            </div>
           </div>
         </div>
 
@@ -100,31 +207,46 @@ export default function App() {
                   className="flex-1 px-4 py-2 border border-green-500 bg-black text-green-400 focus:outline-none focus:ring-2 focus:ring-green-500 font-mono"
                   placeholder="Choose where to export footage"
                 />
-                <button className="px-4 py-2 border border-green-500 bg-black text-green-400 hover:bg-green-500 hover:text-black transition-colors" onClick={onChooseDestinationClick}>
+                <button
+                  className="px-4 py-2 border border-green-500 bg-black text-green-400 hover:bg-green-500 hover:text-black transition-colors"
+                  onClick={handleChooseDestinationClick}
+                >
                   BROWSE
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Export Button */}
+          {/* Status/Feedback */}
+          {(exportError || exportSuccess || isExporting) && (
+            <div className="border-t border-green-500 pt-4 mt-4">
+              {isExporting && (
+                <div className="flex items-center gap-2 text-green-500">
+                  <LoaderCircle className="size-4 animate-spin" />
+                  <span>EXPORTING FILES...</span>
+                </div>
+              )}
+              {exportError && (
+                <div className="flex items-center gap-2 text-red-500">
+                  <span className="font-bold">[ERROR]</span> {exportError}
+                </div>
+              )}
+              {exportSuccess && (
+                <div className="flex items-center gap-2 text-green-500">
+                  <span className="font-bold">[SUCCESS]</span> Files exported
+                  successfully!
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Removed old export button logic */}
           <div className="flex items-center justify-between border-t border-green-500 pt-4">
             <div className="text-sm text-green-400">
               {selectedVolume && mediaFiles.length > 0 && (
-                <span>
-                  [INFO] {mediaFiles.length} MEDIA FILE
-                  {mediaFiles.length !== 1 ? "S" : ""} DETECTED
-                </span>
+                <span>[INFO] MEDIA FILES DETECTED: {mediaFiles.length}</span>
               )}
             </div>
-            <button
-              onClick={handleExport}
-              disabled={!canExport}
-              className="px-6 py-2 bg-green-500 text-black hover:bg-green-400 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-bold"
-            >
-              <Download className="size-4" />
-              EXPORT ALL FILES
-            </button>
           </div>
         </div>
 
@@ -136,7 +258,14 @@ export default function App() {
                 &gt; MEDIA_FILES_DETECTED
               </span>
             </div>
-            <FileTable onCheckChange={onCheckChange} files={mediaFiles} />
+            <FileTable
+              onCheckChange={onCheckChange}
+              files={mediaFiles}
+              onExportSelected={handleExportSelected}
+              onCheckToggleAll={onCheckToggleAll}
+              exportProgress={exportProgress}
+              destinationIsSet={exportDestination !== ""}
+            />
           </div>
         )}
 
@@ -149,12 +278,13 @@ export default function App() {
               <HardDrive className="size-12 text-green-500 mx-auto mb-4" />
             )}
             <div className="text-green-500 font-bold mb-2">
-             {isLoading ? "SCANNING..." : "[WARNING] NO MEDIA FILES FOUND"}
+              {isLoading ? "SCANNING..." : "[WARNING] NO MEDIA FILES FOUND"}
             </div>
-            {(!isLoading && mediaFiles.length === 0) &&
-            <div className="text-green-400 text-sm">
-              No DVR footage detected on selected volume.
-            </div>}
+            {!isLoading && mediaFiles.length === 0 && (
+              <div className="text-green-400 text-sm">
+                No DVR footage detected on selected volume.
+              </div>
+            )}
           </div>
         )}
 

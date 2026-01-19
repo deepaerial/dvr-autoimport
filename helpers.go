@@ -4,8 +4,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/abema/go-mp4"
+	"github.com/djherbis/times"
 	"github.com/sunfish-shogi/bufseekio"
 )
 
@@ -50,4 +52,22 @@ func GetVideoDurationSeconds(path string) (uint64, error) {
 		return 0, err
 	}
 	return info.Duration, nil
+}
+
+// GetMediFileCreationDate gets the creation date of a media file in format YYYY-MM-DD
+func GetMediFileCreationDate(path string) (string, error) {
+	t, err := times.Stat(path)
+	if err != nil {
+		return "UNKNOWN", err
+	}
+	var creationDate time.Time
+
+	if t.HasBirthTime() {
+		creationDate = t.BirthTime()
+	} else if t.HasChangeTime() {
+		creationDate = t.ChangeTime()
+	} else {
+		creationDate = t.ModTime()
+	}
+	return creationDate.Format("2006-01-02"), nil
 }
