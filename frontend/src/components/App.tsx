@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { HardDrive, FolderOpen, LoaderCircle } from "lucide-react";
+import { HardDrive, FolderOpen, LoaderCircle, TriangleAlert } from "lucide-react";
 import type { MediaFile } from "./FileTable";
 import { FileTable } from "./FileTable";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
@@ -10,6 +10,8 @@ import {
   ChooseDestinationFolder,
   ExportFiles,
 } from "../../wailsjs/go/main/App";
+
+import { useErrorMessage } from "@/hooks";
 
 export interface ExportProgressPayload {
   fileName: string;
@@ -30,6 +32,7 @@ export default function App() {
   const [exportProgress, setExportProgress] = useState<
     Record<string, ExportProgressPayload>
   >({});
+  const [userInputError, setUserInputErrorMessage] = useErrorMessage();
 
   useEffect(() => {
     EventsOn("export-progress", (payload: ExportProgressPayload) => {
@@ -111,12 +114,12 @@ export default function App() {
     setExportSuccess(false);
     setExportProgress({});
     if (!exportDestination) {
-      alert("Please choose an export destination first.");
+      setUserInputErrorMessage("Please choose an export destination first.");
       return;
     }
 
     if (selectedFiles.length === 0) {
-      alert("No files selected for export.");
+      setUserInputErrorMessage("Please select at least one file to export.");
       return;
     }
 
@@ -159,7 +162,7 @@ export default function App() {
     <div className="min-h-screen bg-black p-8 font-mono">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8 border border-green-500 p-4 bg-black">
+        <div className="mb-8 border border-green-500 p-4 bg-black flex flex-row" >
           <div className="text-green-500">
             <div className="text-xs mb-2">
               ┌─────────────────────────────────────────────────────────────────┐
@@ -175,6 +178,12 @@ export default function App() {
               └─────────────────────────────────────────────────────────────────┘
             </div>
           </div>
+          {userInputError && (
+          <div className="text-sm border border-red-400 p-4 bg-black flex flex-row items-center gap-2 ml-10">
+            <TriangleAlert className="size-6 text-red-500 inline-block mr-2" />
+            <span className="text-red-500 font-bold">{userInputError}</span>
+          </div>)
+          }
         </div>
 
         {/* Controls */}
@@ -259,8 +268,9 @@ export default function App() {
               </span>
             </div>
             <FileTable
-              onCheckChange={onCheckChange}
               files={mediaFiles}
+              isExportButtonDisabled={exportDestination === "" || isExporting}
+              onCheckChange={onCheckChange}
               onExportSelected={handleExportSelected}
               onCheckToggleAll={onCheckToggleAll}
               exportProgress={exportProgress}

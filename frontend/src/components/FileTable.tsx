@@ -12,6 +12,7 @@ export interface MediaFile {
 
 interface FileTableProps {
   files: MediaFile[];
+  isExportButtonDisabled: boolean;
   onCheckChange: (file: MediaFile, isChecked: boolean) => void;
   onExportSelected: (selectedFiles: MediaFile[]) => void;
   onCheckToggleAll: (isChecked: boolean) => void;
@@ -21,6 +22,7 @@ interface FileTableProps {
 
 export function FileTable({
   files,
+  isExportButtonDisabled = false,
   onCheckChange,
   onExportSelected,
   onCheckToggleAll,
@@ -41,7 +43,7 @@ export function FileTable({
 
   const selectedFiles = files.filter((file) => file.isChecked);
   const allFilesSelected = selectedFiles.length > 0;
-  const isExportButtonDisabled = selectedFiles.length === 0;
+  isExportButtonDisabled = isExportButtonDisabled || selectedFiles.length === 0;
 
   const handleExportClick = () => {
     onExportSelected(selectedFiles);
