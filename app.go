@@ -63,13 +63,22 @@ func (a *App) VolumesFromGetfsstat() ([]string, error) {
 }
 
 type MediaFile struct {
-	Path     string
-	Filename string
-	Size     int64
-	Status   string
-	Duration uint64
+	Path     string `json:"path"`
+	Filename string `json:"filename"`
+	Size     int64  `json:"size"`
+	Status   string `json:"status"`
+	Duration uint64 `json:"duration"`
 }
 
+// GetMediaFilesForVolume walks through the specified volume path and collects information about media files.
+// It returns a slice of MediaFile structs containing the path, filename, size, status, and duration of each media file found.
+// The function handles permission errors gracefully by logging them and skipping the affected files or directories.
+// Parameters:
+//   - volumePath: The root directory path of the volume to scan for media files.
+//
+// Returns:
+//   - A slice of MediaFile structs representing the media files found on the volume.
+//   - An error if any unexpected issues occur during the directory traversal.
 func (a *App) GetMediaFilesForVolume(volumePath string) ([]MediaFile, error) {
 	var foundMediaFiles []MediaFile
 	err := filepath.WalkDir(volumePath, func(path string, info fs.DirEntry, err error) error {
@@ -108,6 +117,25 @@ func (a *App) GetMediaFilesForVolume(volumePath string) ([]MediaFile, error) {
 		log.Printf("error at: %v", err)
 	}
 	return foundMediaFiles, nil
+}
+
+// Function returns a list of media files that have already been exported to the destination folder.
+func (a *App) CheckIfFilesAlreadyExported(files []MediaFile, destFolderBase string) ([]MediaFile, error) {
+	var alreadyExported []MediaFile = []MediaFile{}
+	for _, file := range files {
+		destPath, err := GetDestinationPathForFile(file.Path, destFolderBase)
+		if err != nil {
+			log.Printf("error getting destination path for %s: %v", file.Path, err)
+			continue
+		}
+		if _, err := os.Stat(destPath); err == nil {
+			file.Status = "completed"
+			alreadyExported = append(alreadyExported, file)
+		} else if !os.IsNotExist(err) {
+			log.Printf("error checking if file exists at %s: %v", destPath, err)
+		}
+	}
+	return alreadyExported, nil
 }
 
 // copyJob represents a single file copy operation.
@@ -195,6 +223,16 @@ func (a *App) copyFile(src, destFolderBase string) error {
 }
 
 // ExportFiles copies a list of files to a specified destination directory in parallel.
+// Each file is copied into a subdirectory named after its creation date, and progress events are emitted during the copy.
+// The function uses a fixed number of worker goroutines to avoid disk thrashing.
+// If any file fails to copy, the function collects all errors and returns a combined error.
+// Parameters:
+//   - files: Slice of source file paths to export.
+//   - destinationPath: The base directory where files will be copied.
+//
+// Returns:
+//   - error: nil if all files are exported successfully, otherwise an error containing all encountered issues.
+//
 // It returns an error if any of the operations fail.
 func (a *App) ExportFiles(files []string, destinationPath string) error {
 	if len(files) == 0 {
@@ -254,6 +292,7 @@ func (a *App) ExportFiles(files []string, destinationPath string) error {
 	return nil
 }
 
+// ChooseDestinationFolder opens a directory selection dialog and returns the selected path.
 func (a *App) ChooseDestinationFolder() (string, error) {
 	result, err := wailsruntime.OpenDirectoryDialog(a.ctx, wailsruntime.OpenDialogOptions{
 		Title: "Choose Export Destination",

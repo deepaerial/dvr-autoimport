@@ -9,6 +9,7 @@ import {
   GetMediaFilesForVolume,
   ChooseDestinationFolder,
   ExportFiles,
+  CheckIfFilesAlreadyExported
 } from "../../wailsjs/go/main/App";
 
 import { useErrorMessage } from "@/hooks";
@@ -47,6 +48,25 @@ export default function App() {
     });
   }, []);
 
+  useEffect(() => {
+    if (exportDestination && mediaFiles.length > 0) {
+      CheckIfFilesAlreadyExported(mediaFiles, exportDestination)
+        .then((alreadyExported) => {
+          setMediaFiles((prevFiles) =>
+            prevFiles.map((f) => {
+              if (alreadyExported.some((ef) => ef.path === f.path)) {
+                return { ...f, status: "completed" };
+              }
+              return f;
+            }),
+          );
+        })
+        .catch((err) => {
+          setUserInputErrorMessage(`Error checking existing exports: ${err}`);
+        });
+    }
+  }, [exportDestination, mediaFiles]);
+
   const handleVolumeChange = (volumePath: string) => {
     if (volumePath === "") {
       setSelectedVolume("");
@@ -64,11 +84,11 @@ export default function App() {
     GetMediaFilesForVolume(volumePath)
       .then((files) => {
         const converted = files.map((file) => ({
-          path: file.Path,
-          filename: file.Filename,
-          size: file.Size,
+          path: file.path,
+          filename: file.filename,
+          size: file.size,
           status: "found",
-          duration: file.Duration,
+          duration: file.duration,
           isChecked: true, // by default, all files are checked for export
         }));
         setMediaFiles(converted);

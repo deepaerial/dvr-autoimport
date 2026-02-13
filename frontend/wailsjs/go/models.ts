@@ -1,11 +1,11 @@
 export namespace main {
 	
 	export class MediaFile {
-	    Path: string;
-	    Filename: string;
-	    Size: number;
-	    Status: string;
-	    Duration: number;
+	    path: string;
+	    filename: string;
+	    size: number;
+	    status: string;
+	    duration: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new MediaFile(source);
@@ -13,11 +13,11 @@ export namespace main {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Path = source["Path"];
-	        this.Filename = source["Filename"];
-	        this.Size = source["Size"];
-	        this.Status = source["Status"];
-	        this.Duration = source["Duration"];
+	        this.path = source["path"];
+	        this.filename = source["filename"];
+	        this.size = source["size"];
+	        this.status = source["status"];
+	        this.duration = source["duration"];
 	    }
 	}
 

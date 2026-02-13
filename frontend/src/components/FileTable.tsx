@@ -100,6 +100,7 @@ export function FileTable({
           {files.map((file, id) => {
             const progress = exportProgress[file.filename];
             const percentage = progress ? progress.percentage : 0;
+            const fileShouldExist = file.status === "completed";
 
             return (
               <tr
@@ -155,10 +156,10 @@ export function FileTable({
                 </td>
                 <td className="px-4 py-3">
                   <button
-                    disabled={!destinationIsSet}
+                    disabled={!fileShouldExist}
                     // onClick={() => handleShowInFileSystem(file.filename)}
                     className={`px-3 py-1.5 text-xs bg-black border border-green-500 text-green-400 flex items-center gap-2
-            ${!destinationIsSet ? "opacity-50 cursor-not-allowed" : "hover:bg-green-500 hover:text-black transition-colors"}`}
+            ${!fileShouldExist ? "opacity-50 cursor-not-allowed" : "hover:bg-green-500 hover:text-black transition-colors"}`}
                   >
                     <FolderOpen className="size-3" />
                     SHOW IN FS

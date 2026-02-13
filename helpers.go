@@ -71,3 +71,12 @@ func GetMediFileCreationDate(path string) (string, error) {
 	}
 	return creationDate.Format("2006-01-02"), nil
 }
+
+func GetDestinationPathForFile(filePath, destFolderBase string) (string, error) {
+	creationDate, err := GetMediFileCreationDate(filePath)
+	if err != nil {
+		return "", err
+	}
+	destFolder := filepath.Join(destFolderBase, creationDate)
+	return filepath.Join(destFolder, filepath.Base(filePath)), nil
+}
