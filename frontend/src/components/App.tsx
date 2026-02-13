@@ -54,8 +54,9 @@ export default function App() {
         .then((alreadyExported) => {
           setMediaFiles((prevFiles) =>
             prevFiles.map((f) => {
-              if (alreadyExported.some((ef) => ef.path === f.path)) {
-                return { ...f, status: "completed" };
+              const updatedFile = alreadyExported.find((ef) => ef.path === f.path);
+              if (updatedFile) {
+                return { ...f, status: "completed", exportPath: updatedFile.exportPath };
               }
               return f;
             }),
@@ -89,6 +90,7 @@ export default function App() {
           size: file.size,
           status: "found",
           duration: file.duration,
+          exportPath: file.exportPath,
           isChecked: true, // by default, all files are checked for export
         }));
         setMediaFiles(converted);
@@ -294,7 +296,6 @@ export default function App() {
               onExportSelected={handleExportSelected}
               onCheckToggleAll={onCheckToggleAll}
               exportProgress={exportProgress}
-              destinationIsSet={exportDestination !== ""}
             />
           </div>
         )}

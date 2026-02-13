@@ -18,6 +18,10 @@ export function GetMediaFilesForVolume(arg1) {
   return window['go']['main']['App']['GetMediaFilesForVolume'](arg1);
 }
 
+export function ShowFileInFilesystem(arg1) {
+  return window['go']['main']['App']['ShowFileInFilesystem'](arg1);
+}
+
 export function VolumesFromGetfsstat() {
   return window['go']['main']['App']['VolumesFromGetfsstat']();
 }

@@ -10,4 +10,6 @@ export function ExportFiles(arg1:Array<string>,arg2:string):Promise<void>;
 
 export function GetMediaFilesForVolume(arg1:string):Promise<Array<main.MediaFile>>;
 
+export function ShowFileInFilesystem(arg1:string):Promise<void>;
+
 export function VolumesFromGetfsstat():Promise<Array<string>>;

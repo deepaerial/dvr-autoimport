@@ -1,11 +1,13 @@
 import { Play, CheckCircle2, FolderOpen, Download } from "lucide-react";
 import type { ExportProgressPayload } from "./App";
+import { ShowFileInFilesystem } from "../../wailsjs/go/main/App";
 
 export interface MediaFile {
   path: string;
   filename: string;
   size: number;
   status: string;
+  exportPath: string;
   duration: number;
   isChecked?: boolean;
 }
@@ -17,7 +19,6 @@ interface FileTableProps {
   onExportSelected: (selectedFiles: MediaFile[]) => void;
   onCheckToggleAll: (isChecked: boolean) => void;
   exportProgress: Record<string, ExportProgressPayload>;
-  destinationIsSet: boolean;
 }
 
 export function FileTable({
@@ -27,7 +28,6 @@ export function FileTable({
   onExportSelected,
   onCheckToggleAll,
   exportProgress,
-  destinationIsSet,
 }: FileTableProps) {
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return bytes + " B";
@@ -37,9 +37,9 @@ export function FileTable({
     return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
   };
 
-  // TODO: Implement show in file system functionality
-  // const handleShowInFileSystem = (filename: string) => {
-  // };
+  const handleShowInFileSystem = async (filePath: string) => {
+    await ShowFileInFilesystem(filePath);
+  };
 
   const selectedFiles = files.filter((file) => file.isChecked);
   const allFilesSelected = selectedFiles.length > 0;
@@ -100,7 +100,7 @@ export function FileTable({
           {files.map((file, id) => {
             const progress = exportProgress[file.filename];
             const percentage = progress ? progress.percentage : 0;
-            const fileShouldExist = file.status === "completed";
+            const fileShouldExist = file.status === "completed" && file.exportPath !== "";
 
             return (
               <tr
@@ -157,7 +157,7 @@ export function FileTable({
                 <td className="px-4 py-3">
                   <button
                     disabled={!fileShouldExist}
-                    // onClick={() => handleShowInFileSystem(file.filename)}
+                    onClick={() => handleShowInFileSystem(file.exportPath)}
                     className={`px-3 py-1.5 text-xs bg-black border border-green-500 text-green-400 flex items-center gap-2
             ${!fileShouldExist ? "opacity-50 cursor-not-allowed" : "hover:bg-green-500 hover:text-black transition-colors"}`}
                   >

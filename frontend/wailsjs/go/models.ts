@@ -6,6 +6,7 @@ export namespace main {
 	    size: number;
 	    status: string;
 	    duration: number;
+	    exportPath: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new MediaFile(source);
@@ -18,6 +19,7 @@ export namespace main {
 	        this.size = source["size"];
 	        this.status = source["status"];
 	        this.duration = source["duration"];
+	        this.exportPath = source["exportPath"];
 	    }
 	}
 

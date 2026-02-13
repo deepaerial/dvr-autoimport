@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -63,11 +64,12 @@ func (a *App) VolumesFromGetfsstat() ([]string, error) {
 }
 
 type MediaFile struct {
-	Path     string `json:"path"`
-	Filename string `json:"filename"`
-	Size     int64  `json:"size"`
-	Status   string `json:"status"`
-	Duration uint64 `json:"duration"`
+	Path       string `json:"path"`
+	Filename   string `json:"filename"`
+	Size       int64  `json:"size"`
+	Status     string `json:"status"`
+	Duration   uint64 `json:"duration"`
+	ExportPath string `json:"exportPath"`
 }
 
 // GetMediaFilesForVolume walks through the specified volume path and collects information about media files.
@@ -110,7 +112,7 @@ func (a *App) GetMediaFilesForVolume(volumePath string) ([]MediaFile, error) {
 			log.Printf("error getting video duration for %s: %v", path, err)
 			duration = 0
 		}
-		foundMediaFiles = append(foundMediaFiles, MediaFile{Path: path, Filename: name, Size: fileinfo.Size(), Status: "found", Duration: duration})
+		foundMediaFiles = append(foundMediaFiles, MediaFile{Path: path, Filename: name, Size: fileinfo.Size(), Status: "found", Duration: duration, ExportPath: ""})
 		return nil
 	})
 	if err != nil {
@@ -130,6 +132,7 @@ func (a *App) CheckIfFilesAlreadyExported(files []MediaFile, destFolderBase stri
 		}
 		if _, err := os.Stat(destPath); err == nil {
 			file.Status = "completed"
+			file.ExportPath = destPath
 			alreadyExported = append(alreadyExported, file)
 		} else if !os.IsNotExist(err) {
 			log.Printf("error checking if file exists at %s: %v", destPath, err)
@@ -301,4 +304,18 @@ func (a *App) ChooseDestinationFolder() (string, error) {
 		return "", err
 	}
 	return result, nil
+}
+
+// ShowFileInFilesystem reveals the specified file in the user's file explorer.
+// It constructs the full path to the file using the destination folder and the file's original path
+// to determine the creation date-based subfolder.
+func (a *App) ShowFileInFilesystem(filePath string) error {
+
+	cmd := exec.Command("open", "-R", filePath)
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to open file in filesystem: %w", err)
+	}
+
+	return nil
 }
