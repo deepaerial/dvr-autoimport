@@ -22,7 +22,11 @@ export interface ExportProgressPayload {
   percentage: number;
 }
 
-export default function App() {
+export interface AppProps {
+    version: string;
+}
+
+export default function App({ version }: AppProps) {
   const [selectedVolume, setSelectedVolume] = useState<string>("");
   const [exportDestination, setExportDestination] = useState<string>("");
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
@@ -190,7 +194,7 @@ export default function App() {
               ┌─────────────────────────────────────────────────────────────────┐
             </div>
             <div className="text-2xl font-bold mb-2 pl-2">
-              │ DVR FOOTAGE EXPORTER v1.0
+              │ DVR FOOTAGE EXPORTER {version}
             </div>{" "}
             {/* TODO: Add version number from wails.json */}
             <div className="text-sm pl-2 text-green-400">
