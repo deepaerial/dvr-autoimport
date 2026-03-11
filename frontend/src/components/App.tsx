@@ -44,7 +44,7 @@ export default function App({ version }: AppProps) {
       if (payload.percentage === 100) {
         setMediaFiles((prevFiles) =>
           prevFiles.map((f) =>
-            f.filename === payload.fileName ? { ...f, status: "completed" } : f,
+            f.filename === payload.fileName ? { ...f, status: "completed", exportPath: payload.filePath } : f,
           ),
         );
       } else
@@ -52,25 +52,25 @@ export default function App({ version }: AppProps) {
     });
   }, []);
 
-  useEffect(() => {
-    if (exportDestination && mediaFiles.length > 0) {
-      CheckIfFilesAlreadyExported(mediaFiles, exportDestination)
-        .then((alreadyExported) => {
-          setMediaFiles((prevFiles) =>
-            prevFiles.map((f) => {
-              const updatedFile = alreadyExported.find((ef) => ef.path === f.path);
-              if (updatedFile) {
-                return { ...f, status: "completed", exportPath: updatedFile.exportPath };
-              }
-              return f;
-            }),
-          );
-        })
-        .catch((err) => {
-          setUserInputErrorMessage(`Error checking existing exports: ${err}`);
-        });
-    }
-  }, [exportDestination, mediaFiles]);
+    useEffect(() => {
+      if (exportDestination && mediaFiles.length > 0) {
+        CheckIfFilesAlreadyExported(mediaFiles, exportDestination)
+          .then((alreadyExported) => {
+            setMediaFiles((prevFiles) =>
+              prevFiles.map((f) => {
+                const updatedFile = alreadyExported.find((ef) => ef.path === f.path);
+                if (updatedFile) {
+                  return { ...f, status: "completed", exportPath: updatedFile.exportPath };
+                }
+                return f;
+              }),
+            );
+          })
+          .catch((err) => {
+            setUserInputErrorMessage(`Error checking existing exports: ${err}`);
+          });
+      }
+    }, []);
 
   const handleVolumeChange = (volumePath: string) => {
     if (volumePath === "") {
