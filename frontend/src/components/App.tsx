@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { HardDrive, FolderOpen, LoaderCircle, TriangleAlert } from "lucide-react";
 import type { MediaFile } from "./FileTable";
 import { FileTable } from "./FileTable";
@@ -52,6 +52,11 @@ export default function App({ version }: AppProps) {
     });
   }, []);
 
+  const mediaFilesFingerprint = useMemo(
+    () => mediaFiles.map((f) => f.path).join("|"),
+    [mediaFiles]
+  );
+
     useEffect(() => {
       if (exportDestination && mediaFiles.length > 0) {
         CheckIfFilesAlreadyExported(mediaFiles, exportDestination)
@@ -62,15 +67,16 @@ export default function App({ version }: AppProps) {
                 if (updatedFile) {
                   return { ...f, status: "completed", exportPath: updatedFile.exportPath };
                 }
-                return f;
-              }),
+                return {...f, status: 'found'};
+              })
             );
           })
           .catch((err) => {
             setUserInputErrorMessage(`Error checking existing exports: ${err}`);
           });
       }
-    }, []);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [exportDestination, mediaFilesFingerprint]);
 
   const handleVolumeChange = (volumePath: string) => {
     if (volumePath === "") {
