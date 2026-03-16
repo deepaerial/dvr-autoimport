@@ -1,16 +1,20 @@
-import { useState, useEffect, useMemo } from "react";
-import { HardDrive, FolderOpen, LoaderCircle, TriangleAlert } from "lucide-react";
-import type { MediaFile } from "./FileTable";
+import { useState, useEffect } from "react";
+import type { FileState } from "./FileTable";
 import { FileTable } from "./FileTable";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
+import { main } from "../../wailsjs/go/models";
 
-import SelectVolume from "./SelectVolume";
+import Header from "./Header";
+import ExportControls from "./ExportControls";
+import StatusFeedback from "./StatusFeedback";
+import EmptyStates from "./EmptyStates";
+
 import {
   GetMediaFilesForVolume,
   ChooseDestinationFolder,
   ExportFiles,
   CheckIfFilesAlreadyExported,
-  GetDefaultExportDestination
+  GetDefaultExportDestination,
 } from "../../wailsjs/go/main/App";
 
 import { useErrorMessage } from "@/hooks";
@@ -24,21 +28,56 @@ export interface ExportProgressPayload {
 }
 
 export interface AppProps {
-    version: string;
+  version: string;
 }
 
 export default function App({ version }: AppProps) {
   const [selectedVolume, setSelectedVolume] = useState<string>("");
   const [exportDestination, setExportDestination] = useState<string>("");
-  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
+  const [mediaFiles, setMediaFiles] = useState<main.MediaFile[]>([]);
+  const [fileStates, setFileStates] = useState<Record<string, FileState>>({});
   const [isExporting, setIsExporting] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [exportError, setExportError] = useState<string | null>(null); // New state for export errors
-  const [exportSuccess, setExportSuccess] = useState<boolean>(false); // New state for export success
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exportSuccess, setExportSuccess] = useState<boolean>(false);
   const [exportProgress, setExportProgress] = useState<
     Record<string, ExportProgressPayload>
   >({});
   const [userInputError, setUserInputErrorMessage] = useErrorMessage();
+
+  const checkExports = async (
+    filesToCheck: main.MediaFile[],
+    destination: string,
+  ) => {
+    try {
+      const alreadyExported = await CheckIfFilesAlreadyExported(
+        filesToCheck,
+        destination,
+      );
+      setFileStates((prevStates) => {
+        const nextStates = { ...prevStates };
+        filesToCheck.forEach((f) => {
+          const updatedFile = alreadyExported.find((ef) => ef.path === f.path);
+          if (updatedFile) {
+            nextStates[f.path] = {
+              ...nextStates[f.path],
+              status: "completed",
+              exportPath: updatedFile.exportPath,
+            };
+          } else if (nextStates[f.path]?.status !== "exporting") {
+            nextStates[f.path] = {
+              ...nextStates[f.path],
+              status: "found",
+              exportPath: "",
+            };
+          }
+        });
+        return nextStates;
+      });
+    } catch (err) {
+      setUserInputErrorMessage(`Error checking existing exports: ${err}`);
+    }
+  };
 
   useEffect(() => {
     GetDefaultExportDestination()
@@ -48,54 +87,42 @@ export default function App({ version }: AppProps) {
         }
       })
       .catch((err) => {
-        console.error("Error getting default export destination:", err);
+        setUserInputErrorMessage(
+          `Error getting default export destination: ${err}`,
+        );
       });
-  }, []);
+  }, [setUserInputErrorMessage]);
 
   useEffect(() => {
     EventsOn("export-progress", (payload: ExportProgressPayload) => {
       if (payload.percentage === 100) {
-        setMediaFiles((prevFiles) =>
-          prevFiles.map((f) =>
-            f.filename === payload.fileName ? { ...f, status: "completed", exportPath: payload.filePath } : f,
-          ),
-        );
+        setFileStates((prev) => {
+          // Find file path by filename (assuming filenames are unique within current view)
+          const filePath = Object.keys(prev).find((path) =>
+            path.endsWith(payload.fileName),
+          );
+          if (filePath) {
+            return {
+              ...prev,
+              [filePath]: {
+                ...prev[filePath],
+                status: "completed",
+                exportPath: payload.filePath,
+              },
+            };
+          }
+          return prev;
+        });
       } else
         setExportProgress((prev) => ({ ...prev, [payload.fileName]: payload }));
     });
   }, []);
 
-  const mediaFilesFingerprint = useMemo(
-    () => mediaFiles.map((f) => f.path).join("|"),
-    [mediaFiles]
-  );
-
-    useEffect(() => {
-      if (exportDestination && mediaFiles.length > 0) {
-        CheckIfFilesAlreadyExported(mediaFiles, exportDestination)
-          .then((alreadyExported) => {
-            console.log("Already exported files:", alreadyExported);
-            setMediaFiles((prevFiles) =>
-              prevFiles.map((f) => {
-                const updatedFile = alreadyExported.find((ef) => ef.path === f.path);
-                if (updatedFile) {
-                  return { ...f, status: "completed", exportPath: updatedFile.exportPath };
-                }
-                return {...f, status: 'found'};
-              })
-            );
-          })
-          .catch((err) => {
-            setUserInputErrorMessage(`Error checking existing exports: ${err}`);
-          });
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [exportDestination, mediaFilesFingerprint]);
-
   const handleVolumeChange = (volumePath: string) => {
     if (volumePath === "") {
       setSelectedVolume("");
       setMediaFiles([]);
+      setFileStates({});
       setIsLoading(false);
       setExportProgress({});
       return;
@@ -108,17 +135,20 @@ export default function App({ version }: AppProps) {
 
     GetMediaFilesForVolume(volumePath)
       .then((files) => {
-        const converted = files.map((file) => ({
-          path: file.path,
-          filename: file.filename,
-          size: file.size,
-          status: "found",
-          duration: file.duration,
-          exportPath: file.exportPath,
-          isChecked: true, // by default, all files are checked for export
-        }));
-        setMediaFiles(converted);
+        setMediaFiles(files);
+        const initialStates: Record<string, FileState> = {};
+        files.forEach((f) => {
+          initialStates[f.path] = {
+            status: "found",
+            exportPath: f.exportPath,
+            isChecked: true,
+          };
+        });
+        setFileStates(initialStates);
         setIsLoading(false);
+        if (exportDestination) {
+          checkExports(files, exportDestination);
+        }
       })
       .catch((err) => {
         console.error("Error getting media files:", err);
@@ -128,26 +158,33 @@ export default function App({ version }: AppProps) {
     setIsExporting(false);
   };
 
-  const onCheckChange = (file: MediaFile, isChecked: boolean) => {
-    const updatedFiles = mediaFiles.map((f) =>
-      f.path === file.path ? { ...f, isChecked } : f,
-    );
-    setMediaFiles(updatedFiles);
+  const onCheckChange = (file: main.MediaFile, isChecked: boolean) => {
+    setFileStates((prev) => ({
+      ...prev,
+      [file.path]: { ...prev[file.path], isChecked },
+    }));
   };
 
   const onCheckToggleAll = (isChecked: boolean) => {
-    const updatedFiles = mediaFiles.map((f) => ({ ...f, isChecked }));
-    setMediaFiles(updatedFiles);
+    setFileStates((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((path) => {
+        next[path] = { ...next[path], isChecked };
+      });
+      return next;
+    });
   };
 
   const handleChooseDestinationClick = async () => {
-    // Changed name to avoid conflict, added async
     setExportError(null);
     setExportSuccess(false);
     try {
       const folderPath = await ChooseDestinationFolder();
       if (folderPath) {
         setExportDestination(folderPath);
+        if (mediaFiles.length > 0) {
+          checkExports(mediaFiles, folderPath);
+        }
       }
     } catch (err) {
       console.error("Error choosing destination folder:", err);
@@ -155,7 +192,7 @@ export default function App({ version }: AppProps) {
     }
   };
 
-  const handleExportSelected = async (selectedFiles: MediaFile[]) => {
+  const handleExportSelected = async (selectedFiles: main.MediaFile[]) => {
     setExportError(null);
     setExportSuccess(false);
     setExportProgress({});
@@ -170,35 +207,35 @@ export default function App({ version }: AppProps) {
     }
 
     setIsExporting(true);
-    setMediaFiles((prevFiles) =>
-      prevFiles.map((f) =>
-        selectedFiles.some((sf) => sf.path === f.path)
-          ? { ...f, status: "exporting" }
-          : f,
-      ),
-    );
+    setFileStates((prev) => {
+      const next = { ...prev };
+      selectedFiles.forEach((f) => {
+        next[f.path] = { ...next[f.path], status: "exporting" };
+      });
+      return next;
+    });
 
     try {
       const filePaths = selectedFiles.map((file) => file.path);
       await ExportFiles(filePaths, exportDestination);
       setExportSuccess(true);
-      setMediaFiles((prevFiles) =>
-        prevFiles.map((f) =>
-          selectedFiles.some((sf) => sf.path === f.path)
-            ? { ...f, status: "completed" }
-            : f,
-        ),
-      );
+      setFileStates((prev) => {
+        const next = { ...prev };
+        selectedFiles.forEach((f) => {
+          next[f.path] = { ...next[f.path], status: "completed" };
+        });
+        return next;
+      });
     } catch (err) {
       console.error("Error during export:", err);
       setExportError(`Export failed: ${err}`);
-      setMediaFiles((prevFiles) =>
-        prevFiles.map((f) =>
-          selectedFiles.some((sf) => sf.path === f.path)
-            ? { ...f, status: "found" }
-            : f,
-        ),
-      );
+      setFileStates((prev) => {
+        const next = { ...prev };
+        selectedFiles.forEach((f) => {
+          next[f.path] = { ...next[f.path], status: "found" };
+        });
+        return next;
+      });
     } finally {
       setIsExporting(false);
     }
@@ -207,95 +244,21 @@ export default function App({ version }: AppProps) {
   return (
     <div className="min-h-screen bg-black p-8 font-mono">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8 border border-green-500 p-4 bg-black flex flex-row" >
-          <div className="text-green-500">
-            <div className="text-xs mb-2">
-              ┌─────────────────────────────────────────────────────────────────┐
-            </div>
-            <div className="text-2xl font-bold mb-2 pl-2">
-              │ DVR FOOTAGE EXPORTER {version}
-            </div>{" "}
-            {/* TODO: Add version number from wails.json */}
-            <div className="text-sm pl-2 text-green-400">
-              │ Select mounted volume and export DVR media files
-            </div>
-            <div className="text-xs mt-2">
-              └─────────────────────────────────────────────────────────────────┘
-            </div>
-          </div>
-          {userInputError && (
-          <div className="text-sm border border-red-400 p-4 bg-black flex flex-row items-center gap-2 ml-10">
-            <TriangleAlert className="size-6 text-red-500 inline-block mr-2" />
-            <span className="text-red-500 font-bold">{userInputError}</span>
-          </div>)
-          }
-        </div>
+        <Header version={version} userInputError={userInputError} />
 
-        {/* Controls */}
         <div className="bg-black border border-green-500 p-6 mb-6">
-          <div className="grid grid-cols-2 gap-6 mb-6">
-            {/* Volume Selector */}
-            <div>
-              <label className="block text-sm font-medium text-green-500 mb-2">
-                <div className="flex items-center gap-2">
-                  <HardDrive className="size-4" />
-                  <span>&gt; SOURCE_VOLUME</span>
-                </div>
-              </label>
-              <SelectVolume onChange={handleVolumeChange} />
-            </div>
+          <ExportControls
+            exportDestination={exportDestination}
+            onChooseDestination={handleChooseDestinationClick}
+            onVolumeChange={handleVolumeChange}
+          />
 
-            {/* Export Destination */}
-            <div>
-              <label className="block text-sm font-medium text-green-500 mb-2">
-                <div className="flex items-center gap-2">
-                  <FolderOpen className="size-4" />
-                  <span>&gt; EXPORT_DESTINATION</span>
-                </div>
-              </label>
-              <div className="flex gap-2">
-                <input
-                  readOnly
-                  type="text"
-                  value={exportDestination}
-                  className="flex-1 px-4 py-2 border border-green-500 bg-black text-green-400 focus:outline-none focus:ring-2 focus:ring-green-500 font-mono"
-                  placeholder="Choose where to export footage"
-                />
-                <button
-                  className="px-4 py-2 border border-green-500 bg-black text-green-400 hover:bg-green-500 hover:text-black transition-colors"
-                  onClick={handleChooseDestinationClick}
-                >
-                  BROWSE
-                </button>
-              </div>
-            </div>
-          </div>
+          <StatusFeedback
+            isExporting={isExporting}
+            exportError={exportError}
+            exportSuccess={exportSuccess}
+          />
 
-          {/* Status/Feedback */}
-          {(exportError || exportSuccess || isExporting) && (
-            <div className="border-t border-green-500 pt-4 mt-4">
-              {isExporting && (
-                <div className="flex items-center gap-2 text-green-500">
-                  <LoaderCircle className="size-4 animate-spin" />
-                  <span>EXPORTING FILES...</span>
-                </div>
-              )}
-              {exportError && (
-                <div className="flex items-center gap-2 text-red-500">
-                  <span className="font-bold">[ERROR]</span> {exportError}
-                </div>
-              )}
-              {exportSuccess && (
-                <div className="flex items-center gap-2 text-green-500">
-                  <span className="font-bold">[SUCCESS]</span> Files exported
-                  successfully!
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Removed old export button logic */}
           <div className="flex items-center justify-between border-t border-green-500 pt-4">
             <div className="text-sm text-green-400">
               {selectedVolume && mediaFiles.length > 0 && (
@@ -305,7 +268,6 @@ export default function App({ version }: AppProps) {
           </div>
         </div>
 
-        {/* Media Files Table */}
         {selectedVolume && mediaFiles.length > 0 && (
           <div className="bg-black border border-green-500 p-6">
             <div className="text-green-500 mb-4">
@@ -315,6 +277,7 @@ export default function App({ version }: AppProps) {
             </div>
             <FileTable
               files={mediaFiles}
+              fileStates={fileStates}
               isExportButtonDisabled={exportDestination === "" || isExporting}
               onCheckChange={onCheckChange}
               onExportSelected={handleExportSelected}
@@ -324,36 +287,11 @@ export default function App({ version }: AppProps) {
           </div>
         )}
 
-        {/* Empty State */}
-        {selectedVolume && mediaFiles.length === 0 && (
-          <div className="bg-black border border-green-500 p-12 text-center">
-            {isLoading ? (
-              <LoaderCircle className="size-12 text-green-500 mx-auto mb-4 animate-spin" />
-            ) : (
-              <HardDrive className="size-12 text-green-500 mx-auto mb-4" />
-            )}
-            <div className="text-green-500 font-bold mb-2">
-              {isLoading ? "SCANNING..." : "[WARNING] NO MEDIA FILES FOUND"}
-            </div>
-            {!isLoading && mediaFiles.length === 0 && (
-              <div className="text-green-400 text-sm">
-                No DVR footage detected on selected volume.
-              </div>
-            )}
-          </div>
-        )}
-
-        {!selectedVolume && (
-          <div className="bg-black border border-green-500 p-12 text-center">
-            <HardDrive className="size-12 text-green-500 mx-auto mb-4" />
-            <div className="text-green-500 font-bold mb-2">
-              &gt; AWAITING INPUT
-            </div>
-            <div className="text-green-400 text-sm">
-              Select a mounted volume to scan for DVR footage.
-            </div>
-          </div>
-        )}
+        <EmptyStates
+          selectedVolume={selectedVolume}
+          mediaFilesCount={mediaFiles.length}
+          isLoading={isLoading}
+        />
       </div>
     </div>
   );

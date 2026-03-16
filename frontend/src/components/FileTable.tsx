@@ -1,47 +1,39 @@
-import { Play, CheckCircle2, FolderOpen, Download } from "lucide-react";
+import { Download } from "lucide-react";
 import type { ExportProgressPayload } from "./App";
 import { ShowFileInFilesystem } from "../../wailsjs/go/main/App";
+import { main } from "../../wailsjs/go/models";
+import { FileRow } from "./FileRow";
 
-export interface MediaFile {
-  path: string;
-  filename: string;
-  size: number;
+export interface FileState {
   status: string;
   exportPath: string;
-  duration: number;
-  isChecked?: boolean;
+  isChecked: boolean;
 }
 
 interface FileTableProps {
-  files: MediaFile[];
+  files: main.MediaFile[];
+  fileStates: Record<string, FileState>;
   isExportButtonDisabled: boolean;
-  onCheckChange: (file: MediaFile, isChecked: boolean) => void;
-  onExportSelected: (selectedFiles: MediaFile[]) => void;
+  onCheckChange: (file: main.MediaFile, isChecked: boolean) => void;
+  onExportSelected: (selectedFiles: main.MediaFile[]) => void;
   onCheckToggleAll: (isChecked: boolean) => void;
   exportProgress: Record<string, ExportProgressPayload>;
 }
 
 export function FileTable({
   files,
+  fileStates,
   isExportButtonDisabled = false,
   onCheckChange,
   onExportSelected,
   onCheckToggleAll,
   exportProgress,
 }: FileTableProps) {
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + " KB";
-    if (bytes < 1024 * 1024 * 1024)
-      return (bytes / (1024 * 1024)).toFixed(2) + " MB";
-    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
-  };
-
   const handleShowInFileSystem = async (filePath: string) => {
     await ShowFileInFilesystem(filePath);
   };
 
-  const selectedFiles = files.filter((file) => file.isChecked);
+  const selectedFiles = files.filter((file) => fileStates[file.path]?.isChecked);
   const allFilesSelected = selectedFiles.length > 0;
   isExportButtonDisabled = isExportButtonDisabled || selectedFiles.length === 0;
 
@@ -97,75 +89,26 @@ export function FileTable({
           </tr>
         </thead>
         <tbody>
-          {files.map((file, id) => {
+          {files.map((file) => {
+            const state = fileStates[file.path] || {
+              status: "found",
+              exportPath: "",
+              isChecked: false,
+            };
             const progress = exportProgress[file.filename];
             const percentage = progress ? progress.percentage : 0;
-            const fileShouldExist = file.status === "completed" && file.exportPath !== "";
 
             return (
-              <tr
-                key={id}
-                className="border-b border-green-900 hover:bg-green-950"
-              >
-                <td className="px-4 py-3 text-sm text-green-400">
-                  <div className="flex items-center gap-2">
-                    <Play className="size-4 text-green-500" />
-                    <input
-                      type="checkbox"
-                      checked={file.isChecked}
-                      onChange={(e) => {
-                        onCheckChange(file, e.target.checked);
-                      }}
-                    />
-                    {file.filename}
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-sm text-green-400">
-                  {formatFileSize(file.size)}
-                </td>
-                <td className="px-4 py-3 text-sm text-green-400">
-                  {file.duration}
-                </td>
-                <td className="px-4 py-3">
-                  {file.status === "completed" && (
-                    <div className="flex items-center gap-2 text-green-500">
-                      <CheckCircle2 className="size-4" />
-                      <span className="text-sm font-bold">[OK]</span>
-                    </div>
-                  )}
-                  {file.status === "exporting" && (
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs text-green-400">
-                        <span>[EXPORTING...]</span>
-                        <span>{percentage}%</span>
-                      </div>
-                      <div className="w-full bg-gray-900 border border-green-900 h-4 overflow-hidden">
-                        <div
-                          className="bg-green-500 h-full transition-all duration-300"
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                  {file.status === "found" && (
-                    <span className="text-sm text-green-600">[FOUND]</span>
-                  )}
-                  {file.status === "pending" && (
-                    <span className="text-sm text-green-600">[PENDING]</span>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  <button
-                    disabled={!fileShouldExist}
-                    onClick={() => handleShowInFileSystem(file.exportPath)}
-                    className={`px-3 py-1.5 text-xs bg-black border border-green-500 text-green-400 flex items-center gap-2
-            ${!fileShouldExist ? "opacity-50 cursor-not-allowed" : "hover:bg-green-500 hover:text-black transition-colors"}`}
-                  >
-                    <FolderOpen className="size-3" />
-                    SHOW IN FS
-                  </button>
-                </td>
-              </tr>
+              <FileRow
+                key={file.path}
+                file={file}
+                status={state.status}
+                exportPath={state.exportPath}
+                isChecked={state.isChecked}
+                percentage={percentage}
+                onCheckChange={onCheckChange}
+                onShowInFileSystem={handleShowInFileSystem}
+              />
             );
           })}
         </tbody>
