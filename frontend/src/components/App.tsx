@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
-import type { MediaFile } from "./FileTable";
+import { useState, useEffect } from "react";
+import type { FileState } from "./FileTable";
 import { FileTable } from "./FileTable";
 import { EventsOn } from "../../wailsjs/runtime/runtime";
+import { main } from "../../wailsjs/go/models";
 
 import Header from "./Header";
 import ExportControls from "./ExportControls";
@@ -33,7 +34,8 @@ export interface AppProps {
 export default function App({ version }: AppProps) {
   const [selectedVolume, setSelectedVolume] = useState<string>("");
   const [exportDestination, setExportDestination] = useState<string>("");
-  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
+  const [mediaFiles, setMediaFiles] = useState<main.MediaFile[]>([]);
+  const [fileStates, setFileStates] = useState<Record<string, FileState>>({});
   const [isExporting, setIsExporting] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -43,6 +45,40 @@ export default function App({ version }: AppProps) {
   >({});
   const [userInputError, setUserInputErrorMessage] = useErrorMessage();
 
+  const checkExports = async (
+    filesToCheck: main.MediaFile[],
+    destination: string,
+  ) => {
+    try {
+      const alreadyExported = await CheckIfFilesAlreadyExported(
+        filesToCheck,
+        destination,
+      );
+      setFileStates((prevStates) => {
+        const nextStates = { ...prevStates };
+        filesToCheck.forEach((f) => {
+          const updatedFile = alreadyExported.find((ef) => ef.path === f.path);
+          if (updatedFile) {
+            nextStates[f.path] = {
+              ...nextStates[f.path],
+              status: "completed",
+              exportPath: updatedFile.exportPath,
+            };
+          } else if (nextStates[f.path]?.status !== "exporting") {
+            nextStates[f.path] = {
+              ...nextStates[f.path],
+              status: "found",
+              exportPath: "",
+            };
+          }
+        });
+        return nextStates;
+      });
+    } catch (err) {
+      setUserInputErrorMessage(`Error checking existing exports: ${err}`);
+    }
+  };
+
   useEffect(() => {
     GetDefaultExportDestination()
       .then((dest) => {
@@ -51,61 +87,42 @@ export default function App({ version }: AppProps) {
         }
       })
       .catch((err) => {
-        console.error("Error getting default export destination:", err);
+        setUserInputErrorMessage(
+          `Error getting default export destination: ${err}`,
+        );
       });
-  }, []);
+  }, [setUserInputErrorMessage]);
 
   useEffect(() => {
     EventsOn("export-progress", (payload: ExportProgressPayload) => {
       if (payload.percentage === 100) {
-        setMediaFiles((prevFiles) =>
-          prevFiles.map((f) =>
-            f.filename === payload.fileName
-              ? { ...f, status: "completed", exportPath: payload.filePath }
-              : f,
-          ),
-        );
+        setFileStates((prev) => {
+          // Find file path by filename (assuming filenames are unique within current view)
+          const filePath = Object.keys(prev).find((path) =>
+            path.endsWith(payload.fileName),
+          );
+          if (filePath) {
+            return {
+              ...prev,
+              [filePath]: {
+                ...prev[filePath],
+                status: "completed",
+                exportPath: payload.filePath,
+              },
+            };
+          }
+          return prev;
+        });
       } else
         setExportProgress((prev) => ({ ...prev, [payload.fileName]: payload }));
     });
   }, []);
 
-  const mediaFilesFingerprint = useMemo(
-    () => mediaFiles.map((f) => f.path).join("|"),
-    [mediaFiles],
-  );
-
-  useEffect(() => {
-    if (exportDestination && mediaFiles.length > 0) {
-      CheckIfFilesAlreadyExported(mediaFiles, exportDestination)
-        .then((alreadyExported) => {
-          setMediaFiles((prevFiles) =>
-            prevFiles.map((f) => {
-              const updatedFile = alreadyExported.find(
-                (ef) => ef.path === f.path,
-              );
-              if (updatedFile) {
-                return {
-                  ...f,
-                  status: "completed",
-                  exportPath: updatedFile.exportPath,
-                };
-              }
-              return { ...f, status: "found" };
-            }),
-          );
-        })
-        .catch((err) => {
-          setUserInputErrorMessage(`Error checking existing exports: ${err}`);
-        });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [exportDestination, mediaFilesFingerprint]);
-
   const handleVolumeChange = (volumePath: string) => {
     if (volumePath === "") {
       setSelectedVolume("");
       setMediaFiles([]);
+      setFileStates({});
       setIsLoading(false);
       setExportProgress({});
       return;
@@ -118,17 +135,20 @@ export default function App({ version }: AppProps) {
 
     GetMediaFilesForVolume(volumePath)
       .then((files) => {
-        const converted = files.map((file) => ({
-          path: file.path,
-          filename: file.filename,
-          size: file.size,
-          status: "found",
-          duration: file.duration,
-          exportPath: file.exportPath,
-          isChecked: true, // by default, all files are checked for export
-        }));
-        setMediaFiles(converted);
+        setMediaFiles(files);
+        const initialStates: Record<string, FileState> = {};
+        files.forEach((f) => {
+          initialStates[f.path] = {
+            status: "found",
+            exportPath: f.exportPath,
+            isChecked: true,
+          };
+        });
+        setFileStates(initialStates);
         setIsLoading(false);
+        if (exportDestination) {
+          checkExports(files, exportDestination);
+        }
       })
       .catch((err) => {
         console.error("Error getting media files:", err);
@@ -138,16 +158,21 @@ export default function App({ version }: AppProps) {
     setIsExporting(false);
   };
 
-  const onCheckChange = (file: MediaFile, isChecked: boolean) => {
-    const updatedFiles = mediaFiles.map((f) =>
-      f.path === file.path ? { ...f, isChecked } : f,
-    );
-    setMediaFiles(updatedFiles);
+  const onCheckChange = (file: main.MediaFile, isChecked: boolean) => {
+    setFileStates((prev) => ({
+      ...prev,
+      [file.path]: { ...prev[file.path], isChecked },
+    }));
   };
 
   const onCheckToggleAll = (isChecked: boolean) => {
-    const updatedFiles = mediaFiles.map((f) => ({ ...f, isChecked }));
-    setMediaFiles(updatedFiles);
+    setFileStates((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((path) => {
+        next[path] = { ...next[path], isChecked };
+      });
+      return next;
+    });
   };
 
   const handleChooseDestinationClick = async () => {
@@ -157,6 +182,9 @@ export default function App({ version }: AppProps) {
       const folderPath = await ChooseDestinationFolder();
       if (folderPath) {
         setExportDestination(folderPath);
+        if (mediaFiles.length > 0) {
+          checkExports(mediaFiles, folderPath);
+        }
       }
     } catch (err) {
       console.error("Error choosing destination folder:", err);
@@ -164,7 +192,7 @@ export default function App({ version }: AppProps) {
     }
   };
 
-  const handleExportSelected = async (selectedFiles: MediaFile[]) => {
+  const handleExportSelected = async (selectedFiles: main.MediaFile[]) => {
     setExportError(null);
     setExportSuccess(false);
     setExportProgress({});
@@ -179,35 +207,35 @@ export default function App({ version }: AppProps) {
     }
 
     setIsExporting(true);
-    setMediaFiles((prevFiles) =>
-      prevFiles.map((f) =>
-        selectedFiles.some((sf) => sf.path === f.path)
-          ? { ...f, status: "exporting" }
-          : f,
-      ),
-    );
+    setFileStates((prev) => {
+      const next = { ...prev };
+      selectedFiles.forEach((f) => {
+        next[f.path] = { ...next[f.path], status: "exporting" };
+      });
+      return next;
+    });
 
     try {
       const filePaths = selectedFiles.map((file) => file.path);
       await ExportFiles(filePaths, exportDestination);
       setExportSuccess(true);
-      setMediaFiles((prevFiles) =>
-        prevFiles.map((f) =>
-          selectedFiles.some((sf) => sf.path === f.path)
-            ? { ...f, status: "completed" }
-            : f,
-        ),
-      );
+      setFileStates((prev) => {
+        const next = { ...prev };
+        selectedFiles.forEach((f) => {
+          next[f.path] = { ...next[f.path], status: "completed" };
+        });
+        return next;
+      });
     } catch (err) {
       console.error("Error during export:", err);
       setExportError(`Export failed: ${err}`);
-      setMediaFiles((prevFiles) =>
-        prevFiles.map((f) =>
-          selectedFiles.some((sf) => sf.path === f.path)
-            ? { ...f, status: "found" }
-            : f,
-        ),
-      );
+      setFileStates((prev) => {
+        const next = { ...prev };
+        selectedFiles.forEach((f) => {
+          next[f.path] = { ...next[f.path], status: "found" };
+        });
+        return next;
+      });
     } finally {
       setIsExporting(false);
     }
@@ -249,6 +277,7 @@ export default function App({ version }: AppProps) {
             </div>
             <FileTable
               files={mediaFiles}
+              fileStates={fileStates}
               isExportButtonDisabled={exportDestination === "" || isExporting}
               onCheckChange={onCheckChange}
               onExportSelected={handleExportSelected}
