@@ -2,15 +2,18 @@
 
 A modern desktop application to streamline the export of DVR footage recorded by DJI Goggles (or other devices) from microSD cards. Built with [Wails](https://wails.io/), Go, and React.
 
+![App Screenshot](docs/screenshot.png)
+> App semi-vibecoded with Github Copilot and Gemini CLI.
+
 ## Features
 
 - **Automated Scanning:** Quickly scan mounted volumes (SD cards, external drives) for media files.
-- **Smart Detection:** Automatically detects `.mp4`, `.srt`, `.mov`, `.mkv`, and image files.
-- **Organized Export:** Copies files into subdirectories named by their creation date (`YYYY-MM-DD`) for effortless organization.
+- **Smart Detection:** Automatically detects `.mp4`, `.srt`, `.mov`, `.mkv`.
+- **Organized Export:** Copies files into subdirectories named by their creation date (`YYYY-MM-DD`) for organization.
 - **Duplicate Prevention:** Checks for existing files in the destination to avoid redundant copies.
 - **Real-time Progress:** Visual progress bars for each file during the export process.
 - **Quick Access:** Reveal exported files in Finder/File Explorer directly from the app.
-- **Clean UI:** A terminal-inspired aesthetic for a professional, distraction-free experience.
+- **Terminal UI:** A terminal-inspired aesthetic (will probably change in the future).
 
 ## Configuration
 
@@ -45,8 +48,6 @@ For macOS, this will create a `DVRAutoimporter.app` in the `build/bin` directory
 ## Technical Details
 - **Backend:** Go (using `github.com/wailsapp/wails/v2`)
 - **Frontend:** React (TypeScript)
-- **Styling:** Tailwind CSS (Vanilla CSS focus)
-- **Icons:** Custom high-resolution app icon (1024x1024)
 
 ## Legacy Script (macOS only)
 The original Applescript version is still available as a fallback in the root directory:
