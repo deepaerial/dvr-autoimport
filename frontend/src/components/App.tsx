@@ -9,7 +9,8 @@ import {
   GetMediaFilesForVolume,
   ChooseDestinationFolder,
   ExportFiles,
-  CheckIfFilesAlreadyExported
+  CheckIfFilesAlreadyExported,
+  GetDefaultExportDestination
 } from "../../wailsjs/go/main/App";
 
 import { useErrorMessage } from "@/hooks";
@@ -40,6 +41,18 @@ export default function App({ version }: AppProps) {
   const [userInputError, setUserInputErrorMessage] = useErrorMessage();
 
   useEffect(() => {
+    GetDefaultExportDestination()
+      .then((dest) => {
+        if (dest) {
+          setExportDestination(dest);
+        }
+      })
+      .catch((err) => {
+        console.error("Error getting default export destination:", err);
+      });
+  }, []);
+
+  useEffect(() => {
     EventsOn("export-progress", (payload: ExportProgressPayload) => {
       if (payload.percentage === 100) {
         setMediaFiles((prevFiles) =>
@@ -61,6 +74,7 @@ export default function App({ version }: AppProps) {
       if (exportDestination && mediaFiles.length > 0) {
         CheckIfFilesAlreadyExported(mediaFiles, exportDestination)
           .then((alreadyExported) => {
+            console.log("Already exported files:", alreadyExported);
             setMediaFiles((prevFiles) =>
               prevFiles.map((f) => {
                 const updatedFile = alreadyExported.find((ef) => ef.path === f.path);

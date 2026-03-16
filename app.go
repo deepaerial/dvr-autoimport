@@ -32,6 +32,11 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 }
 
+// GetDefaultExportDestination returns the value of the DVR_EXPORT_PATH environment variable if it exists.
+func (a *App) GetDefaultExportDestination() string {
+	return os.Getenv("DVR_EXPORT_PATH")
+}
+
 // VolumesFromGetfsstat retrieves a list of mounted filesystem volumes on the system.
 // Returns:
 //   - A slice of strings representing the mount points of the filesystems.

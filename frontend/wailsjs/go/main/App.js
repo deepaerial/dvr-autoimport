@@ -14,6 +14,10 @@ export function ExportFiles(arg1, arg2) {
   return window['go']['main']['App']['ExportFiles'](arg1, arg2);
 }
 
+export function GetDefaultExportDestination() {
+  return window['go']['main']['App']['GetDefaultExportDestination']();
+}
+
 export function GetMediaFilesForVolume(arg1) {
   return window['go']['main']['App']['GetMediaFilesForVolume'](arg1);
 }

@@ -25,10 +25,9 @@ func shouldSkipMountPoint(mountPoint string) bool {
 	return false
 }
 
-// using a set for many extensions
+// using a set for video extensions and subtitle files
 var mediaExts = map[string]bool{
 	".mp4": true, ".mov": true, ".mkv": true,
-	".jpg": true, ".jpeg": true, ".png": true,
 	".srt": true,
 }
 
