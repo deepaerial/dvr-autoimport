@@ -16,7 +16,8 @@ import (
 
 // App struct
 type App struct {
-	ctx context.Context
+	ctx      context.Context
+	volWatch *volumeWatcher
 }
 
 // NewApp creates a new App application struct
@@ -28,6 +29,12 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.volWatch = a.startVolumeWatcher()
+}
+
+// shutdown is called when the app exits. It cleans up the volume watcher.
+func (a *App) shutdown(ctx context.Context) {
+	a.volWatch.Stop()
 }
 
 // GetDefaultExportDestination returns the value of the DVR_EXPORT_PATH environment variable if it exists.
@@ -40,6 +47,11 @@ func (a *App) GetDefaultExportDestination() string {
 //   - A slice of strings representing the mount points of the filesystems.
 //   - An error if any system call fails during the process.
 func (a *App) VolumesFromGetfsstat() ([]string, error) {
+	return getVolumesFromGetfsstat()
+}
+
+// getVolumesFromGetfsstat retrieves a list of mounted filesystem volumes on the system, filtering out system mount points.
+func getVolumesFromGetfsstat() ([]string, error) {
 	// first call to get count
 	n, err := unix.Getfsstat(nil, unix.MNT_NOWAIT)
 	if err != nil {

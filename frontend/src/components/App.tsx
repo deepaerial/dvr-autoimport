@@ -249,6 +249,7 @@ export default function App({ version }: AppProps) {
         <div className="bg-black border border-green-500 p-6 mb-6">
           <ExportControls
             exportDestination={exportDestination}
+            selectedVolume={selectedVolume}
             onChooseDestination={handleChooseDestinationClick}
             onVolumeChange={handleVolumeChange}
           />

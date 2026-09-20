@@ -3,12 +3,14 @@ import SelectVolume from "./SelectVolume";
 
 interface ExportControlsProps {
   exportDestination: string;
+  selectedVolume: string;
   onChooseDestination: () => void;
   onVolumeChange: (volumePath: string) => void;
 }
 
 export default function ExportControls({
   exportDestination,
+  selectedVolume,
   onChooseDestination,
   onVolumeChange,
 }: ExportControlsProps) {
@@ -22,7 +24,7 @@ export default function ExportControls({
             <span>&gt; SOURCE_VOLUME</span>
           </div>
         </label>
-        <SelectVolume onChange={onVolumeChange} />
+        <SelectVolume onChange={onVolumeChange} selected={selectedVolume} />
       </div>
 
       {/* Export Destination */}
